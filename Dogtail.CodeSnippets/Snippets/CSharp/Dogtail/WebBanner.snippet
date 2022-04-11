@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CodeSnippets xmlns="http://schemas.microsoft.com/VisualStudio/2005/CodeSnippet">
+	<CodeSnippet Format="1.0.0">
+		<Header>
+			<Title>Web Banner</Title>
+			<Shortcut>wb</Shortcut>
+			<Author>Dogtail</Author>
+			<Description>Add information about the application</Description>
+			<HelpUrl />
+			<SnippetTypes>
+				<SnippetType>Expansion</SnippetType>
+				<SnippetType>SurroundsWith</SnippetType>
+			</SnippetTypes>
+		</Header>
+		<Snippet>
+			<Code Language="csharp">
+				<![CDATA[var urls = builder.WebHost.GetSetting(WebHostDefaults.ServerUrlsKey)?.Replace(";", " ") ?? string.Empty;
+var operatingSystem = RuntimeInformation.OSDescription;
+var environment = app.Environment.EnvironmentName;
+var frameworkDescription = RuntimeInformation.FrameworkDescription;
+string framing = new string[] { urls, operatingSystem, environment, frameworkDescription }
+.OrderByDescending(x => x.Length)
+.Select(x => new string('-', x.Length + 13))
+.First();
+Console.ForegroundColor = ConsoleColor.Green;
+Console.WriteLine(framing);
+Console.Write("       Urls: ");
+Console.ForegroundColor = ConsoleColor.Blue;
+Console.WriteLine(urls);
+Console.ForegroundColor = ConsoleColor.Green;
+Console.Write("  Framework: ");
+Console.WriteLine(frameworkDescription);
+Console.Write("Environment: ");
+Console.WriteLine(environment);
+Console.Write("   Platform: ");
+Console.WriteLine(operatingSystem);
+Console.WriteLine(framing);
+Console.ResetColor();
+]]>
+			</Code>
+			<Imports>
+				<Import>
+					<Namespace>System.Runtime.InteropServices</Namespace>
+				</Import>
+			</Imports>
+		</Snippet>
+	</CodeSnippet>
+</CodeSnippets>
