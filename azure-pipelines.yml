@@ -1,0 +1,130 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  - main
+  - feature/*
+
+parameters:
+  - name: image
+    displayName: Pool Image
+    type: string
+    default: windows-latest
+    values:
+    - windows-latest
+    - windows-2022
+    - windows-2019
+    - ubuntu-latest
+    - ubuntu-20.04
+    - ubuntu-18.04
+    - macOS-latest
+    - macOS-11
+    - macOS-10.15
+
+stages:
+  - stage: Build
+    dependsOn: []
+    displayName: Build
+    
+    jobs:
+    - job:
+      dependsOn: []
+      displayName: Build
+      
+      pool:
+        vmImage: ${{ parameters.image }}
+        
+      steps:
+      - task: TfxInstaller@3
+        inputs:
+          version: 'v0.7.x'
+                
+      - task: QueryAzureDevOpsExtensionVersion@3
+        name: QueryVersion
+        inputs:
+          connectTo: 'VsTeam'
+          connectedServiceName: 'Marketplace'
+          publisherId: 'Dogtail'
+          extensionId: 'DogtailCodeSnippets'
+          versionAction: 'Patch'
+          setBuildNumber: 'true'
+
+      - task: PowerShell@2
+        name: UpdateVersion
+        inputs:
+          targetType: 'inline'
+          script: |
+            $file = Get-ChildItem ./Dogtail.CodeSnippets/source.extension.vsixmanifest
+            $manifest = [xml](Get-Content $file.fullname)
+            $manifest.PackageManifest.Metadata.Identity.Version="$(QueryVersion.Extension.Version)"
+            $manifest.Save($file.fullname)
+          pwsh: true
+          workingDirectory: '$(Build.SourcesDirectory)'
+          
+      - task: VSBuild@1
+        inputs:
+          solution: '**\*.sln'
+          
+      - task: CopyFiles@2
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents: '**/*.vsix'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)'
+          flattenFolders: true
+      
+      - task: CopyFiles@2
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents: '**/extension.manifest.json'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)'
+          flattenFolders: true
+      
+      - task: CopyFiles@2
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents: '**/README.md'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)'
+          flattenFolders: true    
+          
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Build.ArtifactStagingDirectory)'
+          artifact: 'VSIX'
+          publishLocation: 'pipeline'
+
+  - stage: Deploy
+    dependsOn:
+    - Build
+    displayName: Deploy
+
+    jobs:
+    - deployment:
+      dependsOn: 
+      displayName: Deploy
+
+      pool:
+        vmImage: ${{ parameters.image }}
+      environment: Test
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - task: TfxInstaller@3
+              inputs:
+                version: 'v0.7.x'      
+                
+            - task: PublishVisualStudioExtension@3
+              inputs:
+                connectedServiceName: 'Marketplace'
+                vsixFile: '$(Pipeline.Workspace)\VSIX\Dogtail.CodeSnippets.vsix'
+                manifestFile: '$(Pipeline.Workspace)\VSIX\extension.manifest.json'
+                publisherId: 'Dogtail'
+
+            - task: IsAzureDevOpsExtensionValid@3
+              inputs:
+                connectTo: 'VsTeam'
+                connectedServiceName: 'Marketplace'
+                method: 'vsix'
+                vsixFile: '$(Pipeline.Workspace)\VSIX\Dogtail.CodeSnippets.vsix'
